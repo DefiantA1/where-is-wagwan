@@ -5,6 +5,7 @@ import { AdvancedMarker, APIProvider, Circle, Map, Polyline } from "@vis.gl/reac
 import { collection, getDocs, limit, onSnapshot, orderBy, query, Timestamp, where} from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { db } from "./firebase/firebase";
+import { GPSModal } from "./components/modals/GPSModal";
 
 
 const zoom = 11
@@ -27,6 +28,7 @@ function LiveMap(){
   const [gps, setGps] = useState<gps[] | null>(null);
 
   const [trackers, setTrackers] = useState<string[] | null>(null);
+  const [isOpen, setIsOpen] = useState<boolean>(false);
   
 
   useEffect(() => {
@@ -105,6 +107,7 @@ function LiveMap(){
               </>
             }
           </Map>
+          <GPSModal isOpen={isOpen} exit={() => setIsOpen(false)} gps={gps}/>
         </div>
       </APIProvider>
     </div>
@@ -121,7 +124,7 @@ function LiveMap(){
               ? <AdvancedMarker
                   className="cursor-pointer"
                   position={latestGPS}
-                  onClick={() => setWagwanImg(!wagwanImg)}
+                  onClick={() => setIsOpen(true)}
                 >
                   <img src="/wagwan-large.png" width={120} height={120} />
                 </AdvancedMarker>
