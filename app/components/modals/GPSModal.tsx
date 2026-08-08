@@ -18,9 +18,9 @@ export function GPSModal({isOpen, exit, gps} : GPSModalProps){
   const [assetMap, setAssetMap] = useState<Record<string, string> | null>(null);
 
   useEffect(() => {
-    if(gps == null){
-      return;
-    }
+    // if(gps == null){
+    //   return;
+    // }
 
     const getAssets = async () => {
       const q = query(collection(db, 'assets'));
@@ -80,7 +80,7 @@ export function GPSModal({isOpen, exit, gps} : GPSModalProps){
                 <div className="flex gap-3 justify-between items-end">
                   <div className="flex gap-2 items-center">
                     <IdCardIcon/>
-                    <p className="text-sm">{assetMap == null ? g.id : assetMap[g.id]} ({g.id})</p>
+                    <p className="text-sm">{assetMap == null ? g.id : assetMap[g.id]}</p>
                   </div>
                   <p className="text-sm">{convertToElasped(g.createdAt)}</p>
                 </div>
