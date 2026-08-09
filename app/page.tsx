@@ -29,6 +29,8 @@ function LiveMap(){
 
   const [trackers, setTrackers] = useState<string[] | null>(null);
   const [isOpen, setIsOpen] = useState<boolean>(false);
+
+  const [myLocation, setMyLocation] = useState<{lat: number, lng: number} | null>(null);
   
 
   useEffect(() => {
@@ -38,6 +40,8 @@ function LiveMap(){
       orderBy('createdAt', "desc"),
       limit(60)
     );
+
+    let watchId: any = null;
     
     const unsub = onSnapshot(q, (snapshot) => {
       const docs = snapshot.docs.map((d) => d.data());
@@ -63,7 +67,33 @@ function LiveMap(){
       setGps(gpsLists);
     });
 
-    return () => unsub();
+
+    if (navigator.geolocation) {
+      const watchId = navigator.geolocation.watchPosition(
+        (position) => {
+          setMyLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          });
+        },
+        (error) => {
+          console.error(error);
+        },
+        {
+          enableHighAccuracy: true,
+          maximumAge: 0,
+          timeout: 10000,
+        }
+      );
+    }
+
+    return () => {
+      unsub();
+
+      if(watchId != null){
+        navigator.geolocation.clearWatch(watchId);
+      }
+    };
   }, [])
 
   return (
@@ -104,6 +134,7 @@ function LiveMap(){
                   strokeColor={'#f2c130'}
                   strokeWeight={4}
                 />
+                <MyMarker/>
               </>
             }
           </Map>
@@ -112,6 +143,35 @@ function LiveMap(){
       </APIProvider>
     </div>
   );
+
+  function MyMarker(){
+    return (
+      <>  
+        {
+          myLocation != null && <AdvancedMarker 
+              position={myLocation}
+            >
+              <div className="relative flex items-center justify-center">
+                <span
+                  className="absolute size-8 animate-ping rounded-full opacity-40"
+                  style={{ backgroundColor: "#3eb06b" }}
+                />
+                <span
+                  className={`relative block size-3.5 rounded-full border-2 ${
+                      "scale-125 ring-2 ring-white/30" 
+                  }`}
+                  style={{
+                    backgroundColor: "#3eb06b",
+                    borderColor: `#ffffff99`,
+                    boxShadow: `0 0 12px #ffffff66`,
+                  }}
+                />
+              </div>
+          </AdvancedMarker>
+        }
+      </>
+    );
+  }
 
   function WagwanMarker(){
     
