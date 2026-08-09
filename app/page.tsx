@@ -103,13 +103,6 @@ function LiveMap(){
           {
             trackers != null && <div className="z-2 absolute top-2 h-12 w-full flex gap-2 pl-2 items-center">
               <img src={'/logo.png'} width={45}/>
-              {
-                trackers.map((t) => (
-                  <div key={t} className="border border-blue-400 p-2 rounded-xl flex">
-                    <p className="">{t}</p>
-                  </div>
-                ))
-              }
             </div>
           }
           <Map
