@@ -35,10 +35,14 @@ function LiveMap(){
 
   useEffect(() => {
     const gpsCol = collection(db, 'gps');
+
+    const minutesInDay = 1440;
+    const gpsPointsInDay = minutesInDay * 2;
+
     const q = query(
       gpsCol,
       orderBy('createdAt', "desc"),
-      limit(60)
+      limit(gpsPointsInDay)
     );
 
     let watchId: any = null;
@@ -116,7 +120,7 @@ function LiveMap(){
           >
             {
               gps != null && <>
-                <WagwanMarker/>
+                <TrackerMarker/>
                 <Polyline
                   path={gps.map((g) => {
                     return {
@@ -166,7 +170,7 @@ function LiveMap(){
     );
   }
 
-  function WagwanMarker(){
+  function TrackerMarker(){
     
     const latestGPS = {lat: gps![0].lat, lng: gps![0].lng};
     
@@ -179,7 +183,7 @@ function LiveMap(){
                   position={latestGPS}
                   onClick={() => setIsOpen(true)}
                 >
-                  <img src="/wagwan-large.png" width={120} height={120} />
+                  <img src="/car-marker.png" width={120} height={120} />
                 </AdvancedMarker>
               : <AdvancedMarker
                   className="cursor-pointer"

@@ -82,7 +82,7 @@ export function GPSModal({isOpen, exit, gps} : GPSModalProps){
                     <IdCardIcon/>
                     <p className="text-sm">{assetMap == null ? g.id : assetMap[g.id]}</p>
                   </div>
-                  <p className="text-sm">{convertToElasped(g.createdAt)}</p>
+                  <p className="text-sm">{formatTimestamp(g.createdAt)}</p>
                 </div>
                 {
                   i == 0 && <div onClick={() => {
@@ -147,6 +147,54 @@ export function GPSModal({isOpen, exit, gps} : GPSModalProps){
     catch(err){
       toast.error(`${err}`);
     }
+  }
+
+  function formatTimestamp(millisecondsSinceEpoch: number): string {
+    const date = new Date(millisecondsSinceEpoch);
+    const now = new Date();
+
+    const time = date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+
+    const isSameDay = (a: Date, b: Date) =>
+      a.getFullYear() === b.getFullYear() &&
+      a.getMonth() === b.getMonth() &&
+      a.getDate() === b.getDate();
+
+    // Today
+    if (isSameDay(date, now)) {
+      return `${time} Today`;
+    }
+
+    // Yesterday
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+
+    if (isSameDay(date, yesterday)) {
+      return `${time} Yesterday`;
+    }
+
+    // Anything older
+    const day = date.toLocaleDateString('en-US', {
+      weekday: 'short',
+    });
+
+    const month = date.toLocaleDateString('en-US', {
+      month: 'short',
+    });
+
+    const dayNumber = date.getDate();
+    // const year = date.getFullYear();
+
+    const suffix =
+      dayNumber % 10 === 1 && dayNumber !== 11 ? 'st' :
+      dayNumber % 10 === 2 && dayNumber !== 12 ? 'nd' :
+      dayNumber % 10 === 3 && dayNumber !== 13 ? 'rd' :
+      'th';
+
+    return `${time} ${day}, ${dayNumber}${suffix} ${month}`;
   }
 }
 
