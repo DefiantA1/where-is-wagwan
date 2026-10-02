@@ -24,10 +24,13 @@ export default function Home() {
 
 
 function LiveMap(){
-  const [wagwanImg, setWagwanImg] = useState(true);
-  const [gps, setGps] = useState<gps[] | null>(null);
+  // const [wagwanImg, setWagwanImg] = useState(true);
+  // const [gps, setGps] = useState<gps[] | null>(null);
 
-  const [trackers, setTrackers] = useState<string[] | null>(null);
+  const [trails, setTrails] = useState<Record<string, gps[]> | null>(null);
+  const [selectedTrail, setSelectedTrail] = useState<gps[] | null> (null);
+
+  // const [trackers, setTrackers] = useState<string[] | null>(null);
   const [isOpen, setIsOpen] = useState<boolean>(false);
 
   const [myLocation, setMyLocation] = useState<{lat: number, lng: number} | null>(null);
@@ -67,8 +70,23 @@ function LiveMap(){
       const gpsIds = gpsLists.map((g) => g.id);
       const uniqueIds = [...(new Set(gpsIds))];
       
-      setTrackers(uniqueIds);
-      setGps(gpsLists);
+      // setTrackers(uniqueIds);
+      // setGps(gpsLists);
+
+      const _trails : Record<string, gps[]> = {};
+
+      for (let i = 0; i < gpsLists.length; i++) {
+        const gps : gps = gpsLists[i];
+
+        if(_trails[gps.id] == null){
+          _trails[gps.id] = [];
+        }
+
+        _trails[gps.id].push(gps);
+      }
+
+      setTrails(_trails);
+
     });
 
 
@@ -104,8 +122,13 @@ function LiveMap(){
     <div>
       <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAP_API_KEY!}>
         <div className="relative">
-          {
+          {/* {
             trackers != null && <div className="z-2 absolute top-2 h-12 w-full flex gap-2 pl-2 items-center">
+              <img src={'/logo.png'} width={45}/>
+            </div>
+          } */}
+          {
+            trails != null && <div className="z-2 absolute top-2 h-12 w-full flex gap-2 pl-2 items-center">
               <img src={'/logo.png'} width={45}/>
             </div>
           }
@@ -119,6 +142,32 @@ function LiveMap(){
             disableDefaultUI
           >
             {
+              trails != null && <>
+                {
+                  Object.keys(trails).map((trackerId,i) => (
+                    <div key={trackerId}>
+                      <TrackerMarker 
+                        latestGPS={trails[trackerId][0]} 
+                        trail={trails[trackerId]}
+                        index={i}
+                      />
+                      <Polyline
+                        path={trails[trackerId].map((gps) => {
+                          return {
+                            lat: gps.lat,
+                            lng: gps.lng
+                          };
+                        })}
+                        strokeColor={checkWagwanTracker(trackerId) ? '#f23a30' : '#305df2'}
+                        strokeWeight={4}
+                      />
+                    </div>
+                  ))
+                }
+                <MyMarker/>
+              </>
+            }
+            {/* {
               gps != null && <>
                 <TrackerMarker/>
                 <Polyline
@@ -133,9 +182,10 @@ function LiveMap(){
                 />
                 <MyMarker/>
               </>
-            }
+            } */}
           </Map>
-          <GPSModal isOpen={isOpen} exit={() => setIsOpen(false)} gps={gps}/>
+          <GPSModal isOpen={isOpen} exit={() => setIsOpen(false)} gps={selectedTrail}/>
+          
         </div>
       </APIProvider>
     </div>
@@ -170,26 +220,43 @@ function LiveMap(){
     );
   }
 
-  function TrackerMarker(){
+  type TrackerMarkerProps = {
+    latestGPS: gps,
+    trail: gps[],
+    index: number
+  }
+
+  function checkWagwanTracker(id : string){
+    const isWagwanTracker : boolean = ("0C8A0F43CA48" == id);
+    return isWagwanTracker;
+  }
+
+  function TrackerMarker({latestGPS, trail, index} : TrackerMarkerProps){
     
-    const latestGPS = {lat: gps![0].lat, lng: gps![0].lng};
+    // const latestGPS = {lat: gps![0].lat, lng: gps![0].lng};
+
+    const isWagwanTracker = checkWagwanTracker(latestGPS.id);
     
     return (
       <>
         {
-            wagwanImg 
-              ? <AdvancedMarker
+            // wagwanImg 
+            //   ? 
+              <AdvancedMarker
                   className="cursor-pointer"
                   position={latestGPS}
-                  onClick={() => setIsOpen(true)}
+                  onClick={() => {
+                    setIsOpen(true);
+                    setSelectedTrail(trail);
+                  }}
                 >
-                  <img src="/car-marker.png" width={120} height={120} />
+                  <img src={isWagwanTracker ? "/wagwan-large.png" : "car-marker.png"} width={120} height={120} />
                 </AdvancedMarker>
-              : <AdvancedMarker
-                  className="cursor-pointer"
-                  position={latestGPS}
-                  onClick={() => setWagwanImg(!wagwanImg)}
-                ></AdvancedMarker>
+              // : <AdvancedMarker
+              //     className="cursor-pointer"
+              //     position={latestGPS}
+              //     onClick={() => setWagwanImg(!wagwanImg)}
+              //   ></AdvancedMarker>
           }
       </>
     );
