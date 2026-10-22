@@ -261,6 +261,8 @@ function LiveMap(){
 
   const [myLocation, setMyLocation] = useState<{lat: number, lng: number} | null>(null);
   const [selectedDay, setSelectedDay] = useState(() => startOfDay(new Date()).getTime());
+  const [dismissedEmptyDay, setDismissedEmptyDay] = useState<number | null>(null);
+  const noDataForDay = trails != null && Object.keys(trails).length === 0 && dismissedEmptyDay !== selectedDay;
   
 
   useEffect(() => {
@@ -364,6 +366,7 @@ function LiveMap(){
               selectedDay={selectedDay}
               onSelect={(day) => {
                 setSelectedDay(day);
+                setTrails(null);
                 setFocusedPoint(null);
                 setSelectedTrail(null);
                 setIsOpen(false);
@@ -443,6 +446,26 @@ function LiveMap(){
               </>
             } */}
           </Map>
+          {
+            noDataForDay && <div
+              className="fixed inset-0 z-30 flex items-center justify-center bg-black/50"
+              onClick={() => setDismissedEmptyDay(selectedDay)}
+            >
+              <div
+                className="mx-6 w-full max-w-sm rounded-2xl bg-white p-6 text-neutral-900 shadow-xl"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <p className="text-base font-semibold">No data for that day</p>
+                <button
+                  type="button"
+                  className="mt-5 w-full rounded-lg bg-neutral-900 py-2.5 text-sm font-semibold text-white"
+                  onClick={() => setDismissedEmptyDay(selectedDay)}
+                >
+                  OK
+                </button>
+              </div>
+            </div>
+          }
           <GPSModal
             isOpen={isOpen}
             exit={() => setIsOpen(false)}
