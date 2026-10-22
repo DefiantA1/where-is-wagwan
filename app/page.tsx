@@ -544,7 +544,7 @@ function LiveMap(){
                     setSelectedTrail(trail);
                   }}
                 >
-                  <img src={isWagwanTracker ? "/wagwan-large.png" : "richie.png"} width={120} height={120} />
+                  <img src={"car-marker.png"} width={120} height={120} />
                 </AdvancedMarker>
               // : <AdvancedMarker
               //     className="cursor-pointer"
