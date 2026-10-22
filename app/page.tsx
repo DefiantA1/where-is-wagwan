@@ -2,10 +2,11 @@
 
 import { AdvancedMarker, APIProvider, Circle, Map, Polyline, useMap } from "@vis.gl/react-google-maps";
 
-import { collection, getDocs, limit, onSnapshot, orderBy, query, Timestamp, where} from "firebase/firestore";
-import { useEffect, useState } from "react";
+import { collection, onSnapshot, orderBy, query, Timestamp, where} from "firebase/firestore";
+import { useEffect, useRef, useState } from "react";
 import { db } from "./firebase/firebase";
 import { GPSModal } from "./components/modals/GPSModal";
+import { ArrowDownIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 
 
 const zoom = 11
@@ -23,6 +24,154 @@ type FocusTarget = {
   createdAt: number,
   key: number
 };
+
+function startOfDay(date: Date) {
+  const day = new Date(date);
+  day.setHours(0, 0, 0, 0);
+  return day;
+}
+
+function isSameCalendarDay(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear()
+    && a.getMonth() === b.getMonth()
+    && a.getDate() === b.getDate();
+}
+
+const weekdays = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+
+function DayPicker({ selectedDay, onSelect }: { selectedDay: number, onSelect: (day: number) => void }) {
+  const [open, setOpen] = useState(false);
+  const [visibleMonth, setVisibleMonth] = useState(() => {
+    const date = new Date(selectedDay);
+    return new Date(date.getFullYear(), date.getMonth(), 1);
+  });
+  const rootRef = useRef<HTMLDivElement>(null);
+  const selectedDate = new Date(selectedDay);
+  const label = isSameCalendarDay(selectedDate, new Date())
+    ? "Today"
+    : selectedDate.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const date = new Date(selectedDay);
+    setVisibleMonth(new Date(date.getFullYear(), date.getMonth(), 1));
+
+    function onPointerDown(event: MouseEvent) {
+      if (rootRef.current != null && !rootRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [open, selectedDay]);
+
+  function shiftDay(amount: number) {
+    const next = new Date(selectedDay);
+    next.setDate(next.getDate() + amount);
+    onSelect(startOfDay(next).getTime());
+  }
+
+  const year = visibleMonth.getFullYear();
+  const month = visibleMonth.getMonth();
+  const firstWeekday = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const days = [
+    ...Array.from({ length: firstWeekday }, () => null),
+    ...Array.from({ length: daysInMonth }, (_, index) => index + 1),
+  ];
+
+  return (
+    <div ref={rootRef} className="relative flex items-center gap-2">
+      <button
+        type="button"
+        aria-label="Previous day"
+        className="flex size-10 items-center justify-center rounded-md bg-white text-neutral-900 shadow-lg"
+        onClick={() => shiftDay(-1)}
+      >
+        <ChevronLeftIcon className="size-5" />
+      </button>
+      <button
+        type="button"
+        className="rounded-md bg-white px-3 py-2 text-sm font-semibold text-neutral-900 shadow-lg flex items-center justify-between gap-2"
+        onClick={() => setOpen(!open)}
+      >
+        <p>{label}</p>
+        <ChevronDownIcon className="size-4"/>
+      </button>
+      <button
+        type="button"
+        aria-label="Next day"
+        className="flex size-10 items-center justify-center rounded-md bg-white text-neutral-900 shadow-lg"
+        onClick={() => shiftDay(1)}
+      >
+        <ChevronRightIcon className="size-5" />
+      </button>
+      {
+        open && <div className="absolute left-1/2 top-full z-30 mt-2 w-72 -translate-x-1/2 rounded-2xl bg-white p-4 text-neutral-900 shadow-xl">
+          <div className="mb-3 flex items-center justify-between">
+            <button
+              type="button"
+              className="flex size-8 items-center justify-center rounded-full hover:bg-neutral-100"
+              onClick={() => setVisibleMonth(new Date(year, month - 1, 1))}
+            >
+              ‹
+            </button>
+            <p className="text-sm font-semibold">
+              {visibleMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+            </p>
+            <button
+              type="button"
+              className="flex size-8 items-center justify-center rounded-full hover:bg-neutral-100"
+              onClick={() => setVisibleMonth(new Date(year, month + 1, 1))}
+            >
+              ›
+            </button>
+          </div>
+          <div className="grid grid-cols-7 text-center text-xs text-neutral-400">
+            {weekdays.map((weekday) => <div key={weekday} className="py-1">{weekday}</div>)}
+          </div>
+          <div className="grid grid-cols-7">
+            {
+              days.map((day, index) => {
+                if (day == null) {
+                  return <div key={`empty-${index}`} />;
+                }
+
+                const date = new Date(year, month, day);
+                const selected = isSameCalendarDay(date, selectedDate);
+                const today = isSameCalendarDay(date, new Date());
+
+                return (
+                  <button
+                    key={day}
+                    type="button"
+                    className={`mx-auto flex size-9 items-center justify-center rounded-full text-sm ${
+                      selected
+                        ? "bg-neutral-900 font-semibold text-white"
+                        : today
+                          ? "font-semibold text-blue-600 hover:bg-neutral-100"
+                          : "hover:bg-neutral-100"
+                    }`}
+                    onClick={() => {
+                      onSelect(startOfDay(date).getTime());
+                      setOpen(false);
+                    }}
+                  >
+                    {day}
+                  </button>
+                );
+              })
+            }
+          </div>
+        </div>
+      }
+    </div>
+  );
+}
 
 function formatGpsTime(millisecondsSinceEpoch: number): string {
   const date = new Date(millisecondsSinceEpoch);
@@ -111,22 +260,22 @@ function LiveMap(){
   const [focusedPoint, setFocusedPoint] = useState<FocusTarget | null>(null);
 
   const [myLocation, setMyLocation] = useState<{lat: number, lng: number} | null>(null);
+  const [selectedDay, setSelectedDay] = useState(() => startOfDay(new Date()).getTime());
   
 
   useEffect(() => {
     const gpsCol = collection(db, 'gps');
-
-    const minutesInDay = 1440;
-    const gpsPointsInDay = minutesInDay * 2;
+    const start = selectedDay;
+    const end = new Date(selectedDay);
+    end.setDate(end.getDate() + 1);
 
     const q = query(
       gpsCol,
-      orderBy('createdAt', "desc"),
-      limit(gpsPointsInDay)
+      where('createdAt', '>=', start),
+      where('createdAt', '<', end.getTime()),
+      orderBy('createdAt', "desc")
     );
 
-    let watchId: any = null;
-    
     const unsub = onSnapshot(q, (snapshot) => {
       const docs = snapshot.docs.map((d) => d.data());
 
@@ -166,32 +315,33 @@ function LiveMap(){
 
     });
 
-
-    if (navigator.geolocation) {
-      const watchId = navigator.geolocation.watchPosition(
-        (position) => {
-          setMyLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          });
-        },
-        (error) => {
-          // console.error(error);
-        },
-        {
-          enableHighAccuracy: true,
-          maximumAge: 0,
-          timeout: 10000,
-        }
-      );
-    }
-
     return () => {
       unsub();
+    };
+  }, [selectedDay])
 
-      if(watchId != null){
-        navigator.geolocation.clearWatch(watchId);
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      return;
+    }
+
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        setMyLocation({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        });
+      },
+      () => {},
+      {
+        enableHighAccuracy: true,
+        maximumAge: 0,
+        timeout: 10000,
       }
+    );
+
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
     };
   }, [])
 
@@ -209,6 +359,17 @@ function LiveMap(){
               <img src={'/logo.png'} width={45}/>
             </div>
           }
+          <div className="absolute top-2 left-1/2 z-20 -translate-x-1/2">
+            <DayPicker
+              selectedDay={selectedDay}
+              onSelect={(day) => {
+                setSelectedDay(day);
+                setFocusedPoint(null);
+                setSelectedTrail(null);
+                setIsOpen(false);
+              }}
+            />
+          </div>
           <Map
             style={{width: '100vw', height: '100vh'}}
             mapId={process.env.NEXT_PUBLIC_MAP_ID!}
@@ -293,7 +454,6 @@ function LiveMap(){
                 createdAt: point.createdAt,
                 key: Date.now(),
               });
-              setIsOpen(false);
             }}
           />
           
