@@ -7,13 +7,33 @@ import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
 
 
+const fiveMinutesMs = 5 * 60 * 1000;
+
 type GPSModalProps = {
   isOpen: boolean,
   exit: () => void,
-  gps: gps[] | null
+  gps: gps[] | null,
+  onSelect: (point: gps) => void
 }
 
-export function GPSModal({isOpen, exit, gps} : GPSModalProps){
+function gpsItemsAtLeastFiveMinutesApart(points: gps[]): gps[] {
+  const descOrder = [...points].sort((a, b) => b.createdAt - a.createdAt);
+  const listed: gps[] = [];
+
+  for (const point of descOrder) {
+    const previous = listed[listed.length - 1];
+
+    
+
+    if (previous == null || previous.createdAt - point.createdAt >= fiveMinutesMs) {
+      listed.push(point);
+    }
+  }
+
+  return listed;
+}
+
+export function GPSModal({isOpen, exit, gps, onSelect} : GPSModalProps){
   const [loading, setLoading] = useState<boolean>(false);
   const [assetMap, setAssetMap] = useState<Record<string, string> | null>(null);
 
@@ -75,26 +95,8 @@ export function GPSModal({isOpen, exit, gps} : GPSModalProps){
         <hr className="mt-2 mb-4"/>
         <div className="overflow-y-hidden">
           {
-            gps != null && gps.map((g, i) => (
-              <div key={`${g.createdAt}-${g.id}`} className="border-b border-gray-500 mb-4 pb-3 text-gray-700">
-                <div className="flex gap-3 justify-between items-end">
-                  <div className="flex gap-2 items-center">
-                    <IdCardIcon/>
-                    <p className="text-sm">{assetMap == null ? g.id : assetMap[g.id]}</p>
-                  </div>
-                  <p className="text-sm">{formatTimestamp(g.createdAt)}</p>
-                </div>
-                {
-                  i == 0 && <div onClick={() => {
-                    window.open(
-                      `https://www.google.com/maps/search/?api=1&query=${g.lat},${g.lng}`,
-                      "_blank"
-                    );
-                  }} className="cursor-pointer bg-blue-400 text-white p-2 mb-1 mt-2 rounded w-fit">
-                    Go to Location
-                  </div>
-                }
-              </div>
+            assetMap != null && gps != null && gpsItemsAtLeastFiveMinutesApart(gps).map((g) => (
+              <GPSItem key={`${g.createdAt}-${g.id}`} gps={g} assetMap={assetMap} onSelect={onSelect}/>
             ))
           }
         </div>
@@ -148,6 +150,26 @@ export function GPSModal({isOpen, exit, gps} : GPSModalProps){
       toast.error(`${err}`);
     }
   }
+
+
+}
+
+function GPSItem({gps, assetMap, onSelect} : {gps: gps, assetMap: Record<string, string>, onSelect: (point: gps) => void}) {
+  return (
+    <div
+      key={`${gps.createdAt}-${gps.id}`}
+      className="cursor-pointer border-b border-gray-500 mb-4 pb-3 text-gray-700"
+      onClick={() => onSelect(gps)}
+    >
+      <div className="flex gap-3 justify-between items-end">
+        <div className="flex gap-2 items-center">
+          <IdCardIcon/>
+          <p className="text-sm">{assetMap == null ? gps.id : assetMap[gps.id]}</p>
+        </div>
+        <p className="text-sm">{formatTimestamp(gps.createdAt)}</p>
+      </div>
+    </div>
+  );
 
   function formatTimestamp(millisecondsSinceEpoch: number): string {
     const date = new Date(millisecondsSinceEpoch);

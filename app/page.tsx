@@ -1,6 +1,6 @@
 'use client'
 
-import { AdvancedMarker, APIProvider, Circle, Map, Polyline } from "@vis.gl/react-google-maps";
+import { AdvancedMarker, APIProvider, Circle, Map, Polyline, useMap } from "@vis.gl/react-google-maps";
 
 import { collection, getDocs, limit, onSnapshot, orderBy, query, Timestamp, where} from "firebase/firestore";
 import { useEffect, useState } from "react";
@@ -15,11 +15,87 @@ const nukualofa = {
   lng: -175.2049, // Nuku'alofa
 };
 
+const selectedZoom = 16;
+
+type FocusTarget = {
+  lat: number,
+  lng: number,
+  createdAt: number,
+  key: number
+};
+
+function formatGpsTime(millisecondsSinceEpoch: number): string {
+  const date = new Date(millisecondsSinceEpoch);
+  const now = new Date();
+  const minutes = Math.floor((now.getTime() - date.getTime()) / 60000);
+
+  if (minutes < 1) {
+    return "moments ago";
+  }
+
+  if (minutes < 60) {
+    return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  const isSameDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
+
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+
+  if (isSameDay(date, now) && hours < 6) {
+    return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  }
+
+  const clock = date
+    .toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    })
+    .replace(/[\s\u202f]+/g, "");
+
+  if (isSameDay(date, now)) {
+    return `${clock} Today`;
+  }
+
+  if (isSameDay(date, yesterday)) {
+    return `${clock} Yesterday`;
+  }
+
+  const weekday = date.toLocaleDateString("en-US", { weekday: "short" });
+  const month = date.toLocaleDateString("en-US", { month: "short" });
+
+  return `${clock} ${weekday}, ${date.getDate()} ${month}`;
+}
+
 
 export default function Home() {
   return (
     <LiveMap/>
   );
+}
+
+function MapFocus({ target }: { target: FocusTarget | null }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (map == null || target == null) {
+      return;
+    }
+
+    const currentZoom = map.getZoom() ?? zoom;
+
+    map.moveCamera({
+      center: { lat: target.lat, lng: target.lng },
+      zoom: Math.max(currentZoom, selectedZoom),
+    });
+  }, [map, target]);
+
+  return null;
 }
 
 
@@ -32,6 +108,7 @@ function LiveMap(){
 
   // const [trackers, setTrackers] = useState<string[] | null>(null);
   const [isOpen, setIsOpen] = useState<boolean>(false);
+  const [focusedPoint, setFocusedPoint] = useState<FocusTarget | null>(null);
 
   const [myLocation, setMyLocation] = useState<{lat: number, lng: number} | null>(null);
   
@@ -99,7 +176,7 @@ function LiveMap(){
           });
         },
         (error) => {
-          console.error(error);
+          // console.error(error);
         },
         {
           enableHighAccuracy: true,
@@ -141,6 +218,27 @@ function LiveMap(){
             colorScheme="DARK"
             disableDefaultUI
           >
+            <MapFocus target={focusedPoint}/>
+            {
+              focusedPoint != null && <AdvancedMarker
+                position={{ lat: focusedPoint.lat, lng: focusedPoint.lng }}
+                anchorLeft="-50%"
+                anchorTop="-8px"
+                zIndex={20}
+                clickable={false}
+              >
+                <div className="flex flex-col items-center">
+                  <span
+                    className="block size-4 rounded-full border-2 border-white"
+                    style={{ backgroundColor: "#305df2", boxShadow: "0 0 10px #305df2" }}
+                  />
+                  <div className="relative mt-3 rounded-2xl bg-white px-4 py-2.5 text-sm font-semibold text-neutral-900 shadow-lg">
+                    <span className="absolute left-1/2 bottom-full -translate-x-1/2 border-x-8 border-b-8 border-x-transparent border-b-white" />
+                    {formatGpsTime(focusedPoint.createdAt)}
+                  </div>
+                </div>
+              </AdvancedMarker>
+            }
             {
               trails != null && <>
                 {
@@ -184,7 +282,20 @@ function LiveMap(){
               </>
             } */}
           </Map>
-          <GPSModal isOpen={isOpen} exit={() => setIsOpen(false)} gps={selectedTrail}/>
+          <GPSModal
+            isOpen={isOpen}
+            exit={() => setIsOpen(false)}
+            gps={selectedTrail}
+            onSelect={(point) => {
+              setFocusedPoint({
+                lat: point.lat,
+                lng: point.lng,
+                createdAt: point.createdAt,
+                key: Date.now(),
+              });
+              setIsOpen(false);
+            }}
+          />
           
         </div>
       </APIProvider>
