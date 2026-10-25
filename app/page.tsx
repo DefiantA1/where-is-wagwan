@@ -262,7 +262,8 @@ function LiveMap(){
   const [myLocation, setMyLocation] = useState<{lat: number, lng: number} | null>(null);
   const [selectedDay, setSelectedDay] = useState(() => startOfDay(new Date()).getTime());
   const [dismissedEmptyDay, setDismissedEmptyDay] = useState<number | null>(null);
-  const noDataForDay = trails != null && Object.keys(trails).length === 0 && dismissedEmptyDay !== selectedDay;
+  const isToday = selectedDay === startOfDay(new Date()).getTime();
+  const noDataForDay = !isToday && trails != null && Object.keys(trails).length === 0 && dismissedEmptyDay !== selectedDay;
   
 
   useEffect(() => {
