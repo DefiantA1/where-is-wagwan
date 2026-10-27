@@ -6,7 +6,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import "@fortawesome/fontawesome-svg-core/styles.css";
 import { db } from "@/app/firebase/firebase";
 import { collection, getDocs, query } from "firebase/firestore";
-import { ChevronDown, Circle, LocateFixedIcon, LucideCircle, X } from "lucide-react";
+import { ChevronDown, Circle, CircleDot, LocateFixedIcon, LucideCircle, StopCircle, StopCircleIcon, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
 
@@ -33,6 +33,26 @@ type GpsGroup = {
   points: gps[],
   startedAt: number,
   endedAt: number,
+}
+
+function formatMovingDistance(points: gps[]): string {
+  const ordered = [...points].sort((a, b) => a.createdAt - b.createdAt);
+  let meters = 0;
+
+  for (let index = 1; index < ordered.length; index++) {
+    meters += distanceMeters(ordered[index - 1], ordered[index]);
+  }
+
+  return formatKilometers(meters / 1000);
+}
+
+function formatKilometers(kilometers: number): string {
+  const shown = kilometers < 10
+    ? Math.round(kilometers * 10) / 10
+    : Math.round(kilometers);
+  const label = Number.isInteger(shown) ? `${shown}` : shown.toFixed(1);
+
+  return `${label} km`;
 }
 
 function formatDuration(startedAt: number, endedAt: number): string {
@@ -84,6 +104,39 @@ function distanceMeters(a: gps, b: gps) {
     + Math.cos(latitudeA) * Math.cos(latitudeB) * Math.sin(longitudeDelta / 2) ** 2;
 
   return 2 * earthRadius * Math.asin(Math.min(1, Math.sqrt(haversine)));
+}
+
+function movingPointSpeeds(points: gps[]): Map<gps, { kilometers: number, kilometersPerHour: number }> {
+  const ordered = [...points].sort((a, b) => a.createdAt - b.createdAt);
+  const speeds = new Map<gps, { kilometers: number, kilometersPerHour: number }>();
+  let traveledMeters = 0;
+
+  for (let index = 1; index < ordered.length; index++) {
+    const previous = ordered[index - 1];
+    const point = ordered[index];
+    const hopMeters = distanceMeters(previous, point);
+    traveledMeters += hopMeters;
+
+    if (index === ordered.length - 1) {
+      continue;
+    }
+
+    const hours = (point.createdAt - previous.createdAt) / 3_600_000;
+    if (hours <= 0) {
+      continue;
+    }
+
+    speeds.set(point, {
+      kilometers: traveledMeters / 1000,
+      kilometersPerHour: (hopMeters / 1000) / hours,
+    });
+  }
+
+  return speeds;
+}
+
+function formatSpeed(kilometersPerHour: number): string {
+  return `${Math.round(kilometersPerHour)} km/hr`;
 }
 
 function pointsAreWithinThreeMeters(cluster: gps[], point: gps) {
@@ -199,7 +252,7 @@ export function GPSModal({isOpen, exit, gps, onSelect} : GPSModalProps){
   }
 
   function slideInformation(){
-    return `absolute bottom-0 left-0 lg:left-auto right-0 lg:w-90 lg:top-0 lg:rounded-none lg:pt-18 bg-white rounded-t-3xl p-6 transition-transform duration-300 ease-out text-black ${
+    return `absolute bottom-0 left-0 lg:left-auto right-0 lg:w-90 lg:top-0 lg:rounded-none lg:pt-10 bg-white rounded-t-3xl p-6 transition-transform duration-300 ease-out text-black ${
       isOpen ? "translate-y-0 lg:translate-y-0 lg:-translate-x-0 h-100 lg:h-full overflow-y-auto"
         : "translate-y-full lg:translate-y-0 lg:translate-x-full"
     }`;
@@ -218,7 +271,14 @@ export function GPSModal({isOpen, exit, gps, onSelect} : GPSModalProps){
       >
         <div className="flex flex-row justify-between">
           <div className="flex flex-row">
-            <h2 className="mr-3" style={{fontWeight: 'bold'}}>GPS</h2>
+            {
+              assetMap != null && gps != null && <div>
+                {
+                  gps[0].id in assetMap && <span className="text-sm mr-3 font-bold">{assetMap[gps[0].id]}</span>
+                }
+              </div>
+            }
+            {/* <h2 className="mr-3" style={{fontWeight: 'bold'}}>GPS</h2> */}
             <LocateFixedIcon/>
           </div>
           <X className="cursor-pointer" onClick={() => exitModal()}/>
@@ -303,6 +363,7 @@ function GPSItem({group, assetMap, onSelect} : {group: GpsGroup, assetMap: Recor
       ? "text-yellow-500"
       : "text-blue-600";
   const points = pointsAtLeastFiveMinutesApart(group.points);
+  const speeds = group.kind === "moving" ? movingPointSpeeds(group.points) : null;
 
   return (
     <div className="mb-4 border-b border-gray-500 pb-3 text-gray-700">
@@ -316,22 +377,44 @@ function GPSItem({group, assetMap, onSelect} : {group: GpsGroup, assetMap: Recor
           {label}
           <FontAwesomeIcon icon={headerIcon} className={`size-4 ${headerIconColor}`} />
         </span>
-        <span className="text-sm">{formatDuration(group.startedAt, group.endedAt)}</span>
+        <span className="flex items-center gap-1">
+          {group.kind === "moving"
+            // ? `${formatMovingDistance(group.points)} - ${formatDuration(group.startedAt, group.endedAt)}`
+            ? <>
+              <span className="text-sm">{formatMovingDistance(group.points)}</span>
+              <Circle className="size-2 text-green-500 fill-green-500"/>
+              <span className="text-sm">{formatDuration(group.startedAt, group.endedAt)}</span>
+            </>
+            : formatDuration(group.startedAt, group.endedAt)}
+        </span>
       </button>
       {
         open && <div className="mt-3 pl-6">
           {
-            points.map((point) => (
-              <button
-                key={`${point.createdAt}-${point.id}`}
-                type="button"
-                className="flex w-full cursor-pointer items-end justify-between gap-3 border-t border-gray-200 py-3 text-left"
-                onClick={() => onSelect(point)}
-              >
-                <span className="text-sm">{assetMap[point.id] ?? point.id}</span>
-                <span className="text-sm">{formatTimestamp(point.createdAt)}</span>
-              </button>
-            ))
+            points.map((point) => {
+              const speed = speeds?.get(point);
+
+              return (
+                <button
+                  key={`${point.createdAt}-${point.id}`}
+                  type="button"
+                  className="flex w-full cursor-pointer items-end justify-between gap-3 border-t border-gray-200 py-3 text-left"
+                  onClick={() => onSelect(point)}
+                >
+                  {/* <span className="text-sm">{assetMap[point.id] ?? point.id}</span> */}
+                  <span className="text-xs">
+                    {speed != null && <span>{`${formatKilometers(speed.kilometers)} - ${formatSpeed(speed.kilometersPerHour)}`}</span>}
+                    {speed == null && <div className="flex items-center gap-2">
+                      <span className="font-bold">Stopped</span>
+                    </div>}
+                  </span>
+                  <span className="flex items-center gap-3">
+                    {/* {speed != null && <span className="text-sm">{formatSpeed(speed)}</span>} */}
+                    <span className="text-xs">{formatTimestamp(point.createdAt)}</span>
+                  </span>
+                </button>
+              );
+            })
           }
         </div>
       }

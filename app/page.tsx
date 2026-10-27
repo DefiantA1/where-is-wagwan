@@ -1,12 +1,12 @@
 'use client'
 
-import { AdvancedMarker, APIProvider, Circle, Map, Polyline, useMap } from "@vis.gl/react-google-maps";
+import { AdvancedMarker, APIProvider, Map, Polyline, useMap } from "@vis.gl/react-google-maps";
 
 import { collection, onSnapshot, orderBy, query, Timestamp, where} from "firebase/firestore";
 import { useEffect, useRef, useState } from "react";
 import { db } from "./firebase/firebase";
 import { GPSModal } from "./components/modals/GPSModal";
-import { ArrowDownIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 
 
 const zoom = 11
@@ -249,13 +249,9 @@ function MapFocus({ target }: { target: FocusTarget | null }) {
 
 
 function LiveMap(){
-  // const [wagwanImg, setWagwanImg] = useState(true);
-  // const [gps, setGps] = useState<gps[] | null>(null);
-
   const [trails, setTrails] = useState<Record<string, gps[]> | null>(null);
   const [selectedTrail, setSelectedTrail] = useState<gps[] | null> (null);
 
-  // const [trackers, setTrackers] = useState<string[] | null>(null);
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [focusedPoint, setFocusedPoint] = useState<FocusTarget | null>(null);
 
@@ -352,17 +348,12 @@ function LiveMap(){
     <div>
       <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAP_API_KEY!}>
         <div className="relative">
-          {/* {
-            trackers != null && <div className="z-2 absolute top-2 h-12 w-full flex gap-2 pl-2 items-center">
-              <img src={'/logo.png'} width={45}/>
-            </div>
-          } */}
           {
             trails != null && <div className="z-2 absolute top-2 h-12 w-full flex gap-2 pl-2 items-center">
               <img src={'/logo.png'} width={45}/>
             </div>
           }
-          <div className="absolute top-2 left-1/2 z-20 -translate-x-1/2">
+          <div className="absolute top-5 left-1/2 z-20 -translate-x-1/2">
             <DayPicker
               selectedDay={selectedDay}
               onSelect={(day) => {
@@ -430,22 +421,6 @@ function LiveMap(){
                 <MyMarker/>
               </>
             }
-            {/* {
-              gps != null && <>
-                <TrackerMarker/>
-                <Polyline
-                  path={gps.map((g) => {
-                    return {
-                      lat: g.lat,
-                      lng: g.lng
-                    };
-                  })}
-                  strokeColor={'#f2c130'}
-                  strokeWeight={4}
-                />
-                <MyMarker/>
-              </>
-            } */}
           </Map>
           {
             noDataForDay && <div
@@ -527,33 +502,23 @@ function LiveMap(){
   }
 
   function TrackerMarker({latestGPS, trail, index} : TrackerMarkerProps){
-    
-    // const latestGPS = {lat: gps![0].lat, lng: gps![0].lng};
-
-    const isWagwanTracker = checkWagwanTracker(latestGPS.id);
+    const map = useMap();
     
     return (
-      <>
-        {
-            // wagwanImg 
-            //   ? 
-              <AdvancedMarker
-                  className="cursor-pointer"
-                  position={latestGPS}
-                  onClick={() => {
-                    setIsOpen(true);
-                    setSelectedTrail(trail);
-                  }}
-                >
-                  <img src={"car-marker.png"} width={120} height={120} />
-                </AdvancedMarker>
-              // : <AdvancedMarker
-              //     className="cursor-pointer"
-              //     position={latestGPS}
-              //     onClick={() => setWagwanImg(!wagwanImg)}
-              //   ></AdvancedMarker>
-          }
-      </>
+      <AdvancedMarker
+          className="cursor-pointer"
+          position={latestGPS}
+          onClick={() => {
+            setIsOpen(true);
+            setSelectedTrail(trail);
+            map?.moveCamera({
+              center: { lat: latestGPS.lat, lng: latestGPS.lng },
+              zoom: 16,
+            });
+          }}
+        >
+          <img src={"car-marker.png"} width={120} height={120} />
+        </AdvancedMarker>
     );
   }
 }
