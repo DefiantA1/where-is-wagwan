@@ -470,12 +470,11 @@ function GPSItem({group, assetMap, onSelect} : {group: GpsGroup, assetMap: Recor
         </span>
         <span className="flex items-center gap-1">
           {group.kind === "moving"
-            // ? `${formatMovingDistance(group.points)} - ${formatDuration(group.startedAt, group.endedAt)}`
             ? <>
-              <span className="text-sm">{formatMovingDistance(group.points)}</span>
-              <Circle className="size-2 text-green-500 fill-green-500"/>
-              <span className="text-sm">{formatDuration(group.startedAt, group.endedAt)}</span>
-            </>
+                <span className="text-sm">{formatMovingDistance(group.points)}</span>
+                <Circle className="size-2 text-green-500 fill-green-500"/>
+                <span className="text-sm">{formatDuration(group.startedAt, group.endedAt)}</span>
+              </>
             : formatDuration(group.startedAt, group.endedAt)}
         </span>
       </button>
@@ -489,20 +488,21 @@ function GPSItem({group, assetMap, onSelect} : {group: GpsGroup, assetMap: Recor
                 <button
                   key={`${point.createdAt}-${point.id}`}
                   type="button"
-                  className="flex w-full cursor-pointer items-end justify-between gap-3 border-t border-gray-200 py-3 text-left"
+                  className="w-full cursor-pointer border-t border-gray-200 py-3 text-left"
                   onClick={() => onSelect(point)}
                 >
-                  {/* <span className="text-sm">{assetMap[point.id] ?? point.id}</span> */}
-                  <span className="text-xs">
-                    {speed != null && <span>{`${formatKilometers(speed.kilometers)} - ${formatSpeed(speed.kilometersPerHour)}`}</span>}
-                    {speed == null && <div className="flex items-center gap-2">
-                      <span className="font-bold">Stopped</span>
-                    </div>}
-                  </span>
-                  <span className="flex items-center gap-3">
-                    {/* {speed != null && <span className="text-sm">{formatSpeed(speed)}</span>} */}
-                    <span className="text-xs">{formatTimestamp(point.createdAt)}</span>
-                  </span>
+                  <div className="flex flex-row justify-between w-full gap-2">
+                    <span className="text-xs">
+                      {speed != null && <span>{`${formatKilometers(speed.kilometers)}`}</span>}
+                      {speed == null && <div className="flex items-center gap-2">
+                        <span className="font-bold">Stopped</span>
+                      </div>}
+                    </span>
+                    <span className="flex items-center gap-3 text-xs">
+                      {speed != null && <span>{`${formatSpeed(speed.kilometersPerHour)}`}</span>}
+                    </span>
+                  </div>
+                  <p className="text-xs">{formatTimestamp(point.createdAt)}</p>
                 </button>
               );
             })
