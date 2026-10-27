@@ -6,9 +6,10 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import "@fortawesome/fontawesome-svg-core/styles.css";
 import { db } from "@/app/firebase/firebase";
 import { collection, getDocs, query } from "firebase/firestore";
-import { ChevronDown, Circle, CircleDot, LocateFixedIcon, LucideCircle, StopCircle, StopCircleIcon, X } from "lucide-react";
+import { ChevronDown, Circle, CircleDot, Download, LocateFixedIcon, LucideCircle, StopCircle, StopCircleIcon, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
+import * as XLSX from "xlsx";
 
 config.autoAddCss = false;
 
@@ -139,6 +140,84 @@ function formatSpeed(kilometersPerHour: number): string {
   return `${Math.round(kilometersPerHour)} km/hr`;
 }
 
+const tongaTimeZone = "Pacific/Tongatapu";
+
+function formatTongaTime(milliseconds: number): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: tongaTimeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).formatToParts(new Date(milliseconds));
+  const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? "";
+
+  return `${value("year")}-${value("month")}-${value("day")} ${value("hour")}:${value("minute")} ${value("dayPeriod").toUpperCase()}`;
+}
+
+function activityLabel(kind: GpsGroupKind): string {
+  if (kind === "moving") return "Moving";
+  if (kind === "stationary") return "Stationary";
+  return "Parked";
+}
+
+function exportGpsWorkbook(points: gps[], assetMap: Record<string, string>) {
+  const groups = groupGpsPoints(points);
+  const pointRows: (string | number)[][] = [["Tracker", "Activity", "Time", "Latitude", "Longitude", "Distance (km)", "Speed (km/hr)", "Status"]];
+
+  for (const group of groups) {
+    const speeds = group.kind === "moving" ? movingPointSpeeds(group.points) : null;
+    const ordered = [...group.points].sort((a, b) => b.createdAt - a.createdAt);
+
+    for (const point of ordered) {
+      const speed = speeds?.get(point);
+      const tracker = assetMap[point.id] ?? point.id;
+
+      pointRows.push([
+        tracker,
+        activityLabel(group.kind),
+        formatTongaTime(point.createdAt),
+        point.lat,
+        point.lng,
+        speed != null ? formatKilometers(speed.kilometers).replace(" km", "") : "",
+        speed != null ? Math.round(speed.kilometersPerHour) : "",
+        group.kind === "moving" && speed == null ? "Stopped" : "",
+      ]);
+    }
+  }
+
+  const summaryRows: (string | number)[][] = [["Activity", "Distance", "Duration", "Start", "End"]];
+
+  for (const group of groups) {
+    summaryRows.push([
+      activityLabel(group.kind),
+      group.kind === "moving" ? formatMovingDistance(group.points) : "",
+      formatDuration(group.startedAt, group.endedAt),
+      formatTongaTime(group.startedAt),
+      formatTongaTime(group.endedAt),
+    ]);
+  }
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(pointRows), "GPS");
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(summaryRows), "Summary");
+
+  const output = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+  const blob = new Blob([output], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  const tracker = assetMap[points[0].id] ?? points[0].id;
+  const day = formatTongaTime(points[0].createdAt).slice(0, 10);
+  const filename = `${tracker}-${day}.xlsx`.replaceAll(/[^\w.-]+/g, "-");
+
+  link.href = url;
+  link.download = filename;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 function pointsAreWithinThreeMeters(cluster: gps[], point: gps) {
   return cluster.every((member) => distanceMeters(member, point) <= stationaryMeters);
 }
@@ -252,8 +331,8 @@ export function GPSModal({isOpen, exit, gps, onSelect} : GPSModalProps){
   }
 
   function slideInformation(){
-    return `absolute bottom-0 left-0 lg:left-auto right-0 lg:w-90 lg:top-0 lg:rounded-none lg:pt-10 bg-white rounded-t-3xl p-6 transition-transform duration-300 ease-out text-black ${
-      isOpen ? "translate-y-0 lg:translate-y-0 lg:-translate-x-0 h-100 lg:h-full overflow-y-auto"
+    return `absolute bottom-0 left-0 lg:left-auto right-0 lg:w-90 lg:top-0 lg:rounded-none lg:pt-5 bg-white rounded-t-3xl p-6 transition-transform duration-300 ease-out text-black ${
+      isOpen ? "translate-y-0 lg:translate-y-0 lg:-translate-x-0 flex h-100 flex-col overflow-hidden lg:h-full"
         : "translate-y-full lg:translate-y-0 lg:translate-x-full"
     }`;
   }
@@ -284,13 +363,25 @@ export function GPSModal({isOpen, exit, gps, onSelect} : GPSModalProps){
           <X className="cursor-pointer" onClick={() => exitModal()}/>
         </div>
         <hr className="mt-2 mb-4"/>
-        <div className="overflow-y-hidden">
+        <div className="min-h-0 flex-1 overflow-y-auto">
           {
             assetMap != null && gps != null && groupGpsPoints(gps).map((group, index) => (
               <GPSItem key={`${group.kind}-${group.focus.createdAt}-${index}`} group={group} assetMap={assetMap} onSelect={onSelect}/>
             ))
           }
         </div>
+        <button
+          type="button"
+          className="mt-4 flex w-full shrink-0 items-center justify-center gap-2 rounded-lg bg-green-500 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+          disabled={gps == null || gps.length === 0 || assetMap == null}
+          onClick={() => {
+            if (gps == null || assetMap == null || gps.length === 0) return;
+            exportGpsWorkbook(gps, assetMap);
+          }}
+        >
+          <Download className="size-4" />
+          Export to Excel
+        </button>
       </div>
     </div>
   );

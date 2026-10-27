@@ -9,7 +9,7 @@ import { GPSModal } from "./components/modals/GPSModal";
 import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 
 
-const zoom = 11
+const zoom = 12
 
 const nukualofa = {
   lat: -21.1394,
@@ -511,10 +511,10 @@ function LiveMap(){
           onClick={() => {
             setIsOpen(true);
             setSelectedTrail(trail);
-            map?.moveCamera({
-              center: { lat: latestGPS.lat, lng: latestGPS.lng },
-              zoom: 16,
-            });
+            // map?.moveCamera({
+            //   center: { lat: latestGPS.lat, lng: latestGPS.lng },
+            //   zoom: 16,
+            // });
           }}
         >
           <img src={"car-marker.png"} width={120} height={120} />
